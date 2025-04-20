@@ -8,12 +8,14 @@ import {
   getAdminDashboard,
   getModeratorReports,
 } from "../services/api";
+import { AxiosResponse } from "axios";
 
 interface User {
   id: string;
   username: string;
   role: string;
   email: string;
+  status?: string;
 }
 
 interface AuthFormData {
@@ -29,7 +31,7 @@ interface AuthResponse {
 
 interface AuthPageProps {
   user: User | null;
-  setUser: (user: User | null) => void;
+  setUser: (user: User | null) => Promise<void>;
 }
 
 const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
@@ -46,21 +48,26 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
 
   const onSubmit: SubmitHandler<AuthFormData> = async (data) => {
     try {
-      const response = isLogin
-        ? await login(data)
-        : await signup({ ...data, username: data.username ?? "" });
+      const response: AxiosResponse<AuthResponse> = isLogin
+        ? await login(data.email, data.password)
+        : await signup(data.email, data.password, data.username ?? "");
 
       const responseData = response.data as AuthResponse;
-      setUser(responseData.user ?? null);
+      console.log("AuthPage.tsx: API response:", responseData);
+      await setUser(responseData.user ?? null);
+      console.log("AuthPage.tsx: User set to:", responseData.user);
       setMessage(
         responseData.message || `${isLogin ? "Login" : "Signup"} successful!`
       );
       reset();
 
       if (responseData.user) {
+        localStorage.setItem("userEmail", data.email);
+        console.log("AuthPage.tsx: localStorage userEmail set to:", data.email);
         navigate("/options");
       }
     } catch (error: any) {
+      console.error("AuthPage.tsx: Auth error:", error);
       setMessage(error.response?.data?.message || "An error occurred");
     }
   };
@@ -68,8 +75,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
   const handleProfile = async () => {
     if (!user) return;
     try {
-      const response = await getProfile(user.email);
-      setMessage((response.data as AuthResponse).message);
+      const response: AxiosResponse<AuthResponse> = await getProfile(
+        user.email
+      );
+      setMessage(response.data.message);
     } catch (error: any) {
       setMessage(error.response?.data?.message || "Failed to fetch profile");
     }
@@ -78,8 +87,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
   const handleAdminDashboard = async () => {
     if (!user) return;
     try {
-      const response = await getAdminDashboard(user.email);
-      setMessage((response.data as AuthResponse).message);
+      const response: AxiosResponse<AuthResponse> = await getAdminDashboard(
+        user.email
+      );
+      setMessage(response.data.message);
     } catch (error: any) {
       setMessage(
         error.response?.data?.message || "Failed to access admin dashboard"
@@ -90,8 +101,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
   const handleModeratorReports = async () => {
     if (!user) return;
     try {
-      const response = await getModeratorReports(user.email);
-      setMessage((response.data as AuthResponse).message);
+      const response: AxiosResponse<AuthResponse> = await getModeratorReports(
+        user.email
+      );
+      setMessage(response.data.message);
     } catch (error: any) {
       setMessage(
         error.response?.data?.message || "Failed to access moderator reports"

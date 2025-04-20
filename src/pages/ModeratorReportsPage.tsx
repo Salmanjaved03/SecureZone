@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import {
-  getAdminDashboard,
+  getModeratorReports,
   getIncidentReports,
-  banUser,
-  deleteUser,
-  promoteToModerator,
   deleteReport,
   flagReport,
 } from "../services/api";
@@ -30,24 +27,19 @@ interface IncidentReport {
   imageUrl?: string;
   isAnonymous?: boolean;
   isFlagged?: boolean;
-  upvotes: number;
-  downvotes: number;
 }
 
-interface AdminDashboardPageProps {
+interface ModeratorReportsPageProps {
   user: User | null;
   setUser: (user: User | null) => void;
 }
 
-const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
+const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
   user,
   setUser,
 }) => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<IncidentReport[]>([]);
-  const [usernameToBan, setUsernameToBan] = useState("");
-  const [usernameToDelete, setUsernameToDelete] = useState("");
-  const [usernameToPromote, setUsernameToPromote] = useState("");
   const [message, setMessage] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -56,9 +48,9 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
       try {
         if (user) {
           console.log(
-            `Fetching admin dashboard for user: ${user.email}, role: ${user.role}`
+            `Fetching moderator reports for user: ${user.email}, role: ${user.role}`
           );
-          await getAdminDashboard(user.email);
+          await getModeratorReports(user.email);
           const response = await getIncidentReports(user.email);
           console.log("Fetched reports:", response.data.reports);
           setReports(response.data.reports);
@@ -94,66 +86,13 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
     return <Navigate to="/" />;
   }
 
-  if (user.role !== "ADMIN") {
+  if (user.role !== "MODERATOR") {
     return <Navigate to="/options" />;
   }
 
   const handleLogout = () => {
     setUser(null);
     navigate("/");
-  };
-
-  const handleBanUser = async () => {
-    try {
-      console.log(
-        `Banning user: adminEmail=${user.email}, username=${usernameToBan}`
-      );
-      const response = await banUser(user.email, usernameToBan);
-      console.log("Ban user response:", response.data);
-      setMessage(response.data.message);
-      setUsernameToBan("");
-    } catch (error: any) {
-      console.error("Ban user error:", error.response?.data || error.message);
-      setMessage(error.response?.data?.message || "Failed to ban user");
-    }
-  };
-
-  const handleDeleteUser = async () => {
-    try {
-      console.log(
-        `Deleting user: adminEmail=${user.email}, username=${usernameToDelete}`
-      );
-      const response = await deleteUser(user.email, usernameToDelete);
-      console.log("Delete user response:", response.data);
-      setMessage(response.data.message);
-      setUsernameToDelete("");
-      const reportsResponse = await getIncidentReports(user.email);
-      setReports(reportsResponse.data.reports);
-    } catch (error: any) {
-      console.error(
-        "Delete user error:",
-        error.response?.data || error.message
-      );
-      setMessage(error.response?.data?.message || "Failed to delete user");
-    }
-  };
-
-  const handlePromoteToModerator = async () => {
-    try {
-      console.log(
-        `Promoting user: adminEmail=${user.email}, username=${usernameToPromote}`
-      );
-      const response = await promoteToModerator(user.email, usernameToPromote);
-      console.log("Promote user response:", response.data);
-      setMessage(response.data.message);
-      setUsernameToPromote("");
-    } catch (error: any) {
-      console.error(
-        "Promote user error:",
-        error.response?.data || error.message
-      );
-      setMessage(error.response?.data?.message || "Failed to promote user");
-    }
   };
 
   const handleDeleteReport = async (reportId: string) => {
@@ -214,7 +153,7 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         padding: "2rem",
       }}
     >
-      <div style={{ width: "100%", maxWidth: "800px", margin: "0 auto" }}>
+      <div style={{ width: "100%", maxWidth: "600px", margin: "0 auto" }}>
         <h2
           style={{
             fontSize: "1.5rem",
@@ -223,7 +162,7 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             textAlign: "center",
           }}
         >
-          Admin Dashboard - Welcome, {user.username}
+          Moderator Dashboard - Welcome, {user.username}
         </h2>
         <button
           onClick={handleLogout}
@@ -255,155 +194,6 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
         >
           Back to User Options
         </button>
-
-        {/* Admin Actions */}
-        <div
-          style={{
-            backgroundColor: "white",
-            padding: "1.5rem",
-            borderRadius: "8px",
-            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-            marginBottom: "2rem",
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "1.25rem",
-              fontWeight: "bold",
-              marginBottom: "1rem",
-            }}
-          >
-            Admin Actions
-          </h3>
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label
-              htmlFor="banUser"
-              style={{
-                display: "block",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-                marginBottom: "0.25rem",
-              }}
-            >
-              Ban User (Enter Username)
-            </label>
-            <input
-              id="banUser"
-              type="text"
-              value={usernameToBan}
-              onChange={(e) => setUsernameToBan(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                marginBottom: "0.5rem",
-              }}
-            />
-            <button
-              onClick={handleBanUser}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: "#dc3545",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              Ban User
-            </button>
-          </div>
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label
-              htmlFor="deleteUser"
-              style={{
-                display: "block",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-                marginBottom: "0.25rem",
-              }}
-            >
-              Delete User (Enter Username)
-            </label>
-            <input
-              id="deleteUser"
-              type="text"
-              value={usernameToDelete}
-              onChange={(e) => setUsernameToDelete(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                marginBottom: "0.5rem",
-              }}
-            />
-            <button
-              onClick={handleDeleteUser}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: "#dc3545",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              Delete User
-            </button>
-          </div>
-          <div>
-            <label
-              htmlFor="promoteUser"
-              style={{
-                display: "block",
-                fontSize: "0.875rem",
-                fontWeight: "500",
-                marginBottom: "0.25rem",
-              }}
-            >
-              Promote to Moderator (Enter Username)
-            </label>
-            <input
-              id="promoteUser"
-              type="text"
-              value={usernameToPromote}
-              onChange={(e) => setUsernameToPromote(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                marginBottom: "0.5rem",
-              }}
-            />
-            <button
-              onClick={handlePromoteToModerator}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: "#28a745",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              Promote to Moderator
-            </button>
-          </div>
-          {message && (
-            <p
-              style={{
-                marginTop: "1rem",
-                textAlign: "center",
-                color: message.includes("success") ? "green" : "red",
-              }}
-            >
-              {message}
-            </p>
-          )}
-        </div>
 
         {/* Incident Reports Timeline */}
         <div>
@@ -523,6 +313,17 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
             ))
           )}
         </div>
+        {message && (
+          <p
+            style={{
+              marginTop: "1rem",
+              textAlign: "center",
+              color: message.includes("success") ? "green" : "red",
+            }}
+          >
+            {message}
+          </p>
+        )}
       </div>
 
       {/* Modal for enlarged image */}
@@ -581,4 +382,4 @@ const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({
   );
 };
 
-export default AdminDashboardPage;
+export default ModeratorReportsPage;

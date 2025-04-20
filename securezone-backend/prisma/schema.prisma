@@ -21,13 +21,14 @@ enum Role {
 
 model User {
   id        String   @id @default(uuid())
-  username  String   @unique
   email     String   @unique
   password  String
+  username  String
   role      String   @default("NORMAL")
+  isBanned  Boolean  @default(false)
+  reports   IncidentReport[]
+  votes     Vote[]
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  reports   IncidentReport[] // Relation to incident reports
 }
 
 model IncidentReport {
@@ -37,6 +38,22 @@ model IncidentReport {
   location    String
   userId      String
   user        User     @relation(fields: [userId], references: [id])
+  imageUrl    String?
+  isAnonymous Boolean  @default(false)
+  isFlagged   Boolean  @default(false)
+  upvotes     Int      @default(0)
+  downvotes   Int      @default(0)
+  votes       Vote[]
   createdAt   DateTime @default(now())
-  imageUrl    String?  // Optional field to store the image URL
+}
+
+model Vote {
+  id        String   @id @default(uuid())
+  userId    String
+  reportId  String
+  voteType  String   // "UPVOTE" or "DOWNVOTE"
+  user      User     @relation(fields: [userId], references: [id])
+  report    IncidentReport @relation(fields: [reportId], references: [id])
+  createdAt DateTime @default(now())
+  @@unique([userId, reportId])
 }
