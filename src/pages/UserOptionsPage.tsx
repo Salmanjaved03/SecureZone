@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { createIncidentReport, getIncidentReports } from "../services/api";
 
+const BASE_URL = "http://localhost:5000"; // Backend base URL
+
 interface User {
   id: string;
   username: string;
@@ -17,6 +19,7 @@ interface IncidentReport {
   userId: string;
   createdAt: string;
   user: User;
+  imageUrl?: string;
 }
 
 interface UserOptionsPageProps {
@@ -30,7 +33,9 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [image, setImage] = useState<File | undefined>(undefined);
   const [message, setMessage] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null); // State for the modal
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -53,6 +58,12 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
     navigate("/");
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImage(e.target.files[0]);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -61,17 +72,29 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
         description,
         location,
         userId: user.id,
+        image,
       });
-      setReports([{ ...response.data.report, user }, ...reports]); // Add new report to the top
+      setReports([{ ...response.data.report, user }, ...reports]);
       setMessage("Incident report created successfully");
       setTitle("");
       setDescription("");
       setLocation("");
+      setImage(undefined);
     } catch (error: any) {
       setMessage(
         error.response?.data?.message || "Failed to create incident report"
       );
     }
+  };
+
+  // Open the modal with the clicked image
+  const openImageModal = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+  };
+
+  // Close the modal
+  const closeImageModal = () => {
+    setSelectedImage(null);
   };
 
   return (
@@ -229,6 +252,26 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
                 }}
               />
             </div>
+            <div>
+              <label
+                htmlFor="image"
+                style={{
+                  display: "block",
+                  fontSize: "0.875rem",
+                  fontWeight: "500",
+                  marginBottom: "0.25rem",
+                }}
+              >
+                Attach Image (optional, .jpg, .jpeg, .png, max 5MB)
+              </label>
+              <input
+                id="image"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png"
+                onChange={handleImageChange}
+                style={{ width: "100%", padding: "0.5rem 0" }}
+              />
+            </div>
             <button
               type="submit"
               style={{
@@ -306,12 +349,85 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
                 <p style={{ marginBottom: "0.5rem" }}>
                   <strong>Location:</strong> {report.location}
                 </p>
-                <p>{report.description}</p>
+                <p style={{ marginBottom: "0.5rem" }}>{report.description}</p>
+                {report.imageUrl && (
+                  <div>
+                    <p style={{ marginBottom: "0.5rem" }}>
+                      <strong>Image:</strong>
+                    </p>
+                    <img
+                      src={`${BASE_URL}${report.imageUrl}`}
+                      alt="Incident report"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "200px",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                      }}
+                      onClick={() =>
+                        openImageModal(`${BASE_URL}${report.imageUrl}`)
+                      } // Open modal on click
+                    />
+                  </div>
+                )}
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Modal for enlarged image */}
+      {selectedImage && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+          onClick={closeImageModal} // Close modal when clicking outside the image
+        >
+          <div
+            style={{
+              position: "relative",
+              maxWidth: "90%",
+              maxHeight: "90%",
+            }}
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking on the image
+          >
+            <button
+              style={{
+                position: "absolute",
+                top: "-30px",
+                right: "-30px",
+                background: "none",
+                border: "none",
+                color: "white",
+                fontSize: "2rem",
+                cursor: "pointer",
+              }}
+              onClick={closeImageModal}
+            >
+              &times;
+            </button>
+            <img
+              src={selectedImage}
+              alt="Enlarged incident report"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "80vh",
+                borderRadius: "8px",
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

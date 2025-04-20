@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'http://localhost:5000/api'; // Ensure this matches your backend port
 
 interface User {
   id: string;
@@ -17,6 +17,7 @@ interface IncidentReport {
   userId: string;
   createdAt: string;
   user: User;
+  imageUrl?: string;
 }
 
 interface AuthResponse {
@@ -48,8 +49,22 @@ export const getAdminDashboard = (email: string) =>
 export const getModeratorReports = (email: string) =>
   axios.get<AuthResponse>(`${API_URL}/moderator-reports/${email}`);
 
-export const createIncidentReport = (data: { title: string; description: string; location: string; userId: string }) =>
-  axios.post<IncidentReportResponse>(`${API_URL}/reports`, data);
+export const createIncidentReport = (data: { title: string; description: string; location: string; userId: string; image?: File }) => {
+  const formData = new FormData();
+  formData.append('title', data.title);
+  formData.append('description', data.description);
+  formData.append('location', data.location);
+  formData.append('userId', data.userId);
+  if (data.image) {
+    formData.append('image', data.image);
+  }
+
+  return axios.post<IncidentReportResponse>(`${API_URL}/reports`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
 
 export const getIncidentReports = () =>
   axios.get<IncidentReportsResponse>(`${API_URL}/reports`);

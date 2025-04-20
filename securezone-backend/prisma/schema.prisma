@@ -38,4 +38,5 @@ model IncidentReport {
   userId      String
   user        User     @relation(fields: [userId], references: [id])
   createdAt   DateTime @default(now())
+  imageUrl    String?  // Optional field to store the image URL
 }

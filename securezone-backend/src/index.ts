@@ -1,32 +1,72 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
+import path from 'path';
 
 const app = express();
 const prisma = new PrismaClient();
 
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/');
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png/;
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = filetypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('Only .jpg, .jpeg, and .png files are allowed!'));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+});
+
 app.use(cors());
 app.use(express.json());
 
+// Serve static files from the uploads directory
+app.use('/uploads', express.static('uploads'));
+
+// Define a custom RequestHandler type that allows async handlers
+type AsyncRequestHandler = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => Promise<void>;
+
 // Login endpoint
-app.post('/api/login', async (req, res) => {
+const loginHandler: AsyncRequestHandler = async (req, res) => {
   const { email, password } = req.body;
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user || user.password !== password) {
-    return res.status(401).json({ message: 'Invalid email or password' });
+    res.status(401).json({ message: 'Invalid email or password' });
+    return;
   }
 
   res.json({ message: 'Login successful', user });
-});
+};
+app.post('/api/login', loginHandler);
 
 // Signup endpoint
-app.post('/api/signup', async (req, res) => {
+const signupHandler: AsyncRequestHandler = async (req, res) => {
   const { email, password, username } = req.body;
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
-    return res.status(400).json({ message: 'Email already exists' });
+    res.status(400).json({ message: 'Email already exists' });
+    return;
   }
 
   const user = await prisma.user.create({
@@ -34,70 +74,91 @@ app.post('/api/signup', async (req, res) => {
   });
 
   res.status(201).json({ message: 'Signup successful', user });
-});
+};
+app.post('/api/signup', signupHandler);
 
 // Profile endpoint
-app.get('/api/profile/:email', async (req, res) => {
+const profileHandler: AsyncRequestHandler = async (req, res) => {
   const user = await prisma.user.findUnique({ where: { email: req.params.email } });
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    res.status(404).json({ message: 'User not found' });
+    return;
   }
   res.json({ message: `Profile for ${user.username}`, user });
-});
+};
+app.get('/api/profile/:email', profileHandler);
 
 // Admin dashboard endpoint
-app.get('/api/admin-dashboard/:email', async (req, res) => {
+const adminDashboardHandler: AsyncRequestHandler = async (req, res) => {
   const user = await prisma.user.findUnique({ where: { email: req.params.email } });
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    res.status(404).json({ message: 'User not found' });
+    return;
   }
   if (user.role !== 'ADMIN') {
-    return res.status(403).json({ message: 'Access denied' });
+    res.status(403).json({ message: 'Access denied' });
+    return;
   }
   res.json({ message: 'Admin dashboard accessed successfully' });
-});
+};
+app.get('/api/admin-dashboard/:email', adminDashboardHandler);
 
 // Moderator reports endpoint
-app.get('/api/moderator-reports/:email', async (req, res) => {
+const moderatorReportsHandler: AsyncRequestHandler = async (req, res) => {
   const user = await prisma.user.findUnique({ where: { email: req.params.email } });
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    res.status(404).json({ message: 'User not found' });
+    return;
   }
   if (user.role !== 'MODERATOR') {
-    return res.status(403).json({ message: 'Access denied' });
+    res.status(403).json({ message: 'Access denied' });
+    return;
   }
   res.json({ message: 'Moderator reports accessed successfully' });
-});
+};
+app.get('/api/moderator-reports/:email', moderatorReportsHandler);
 
-// Create incident report endpoint
-app.post('/api/reports', async (req, res) => {
+// Create incident report endpoint with image upload
+const createReportHandler: AsyncRequestHandler = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
   const { title, description, location, userId } = req.body;
 
   if (!title || !description || !location || !userId) {
-    return res.status(400).json({ message: 'All fields are required' });
+    res.status(400).json({ message: 'All fields are required' });
+    return;
   }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
-    return res.status(404).json({ message: 'User not found' });
+    res.status(404).json({ message: 'User not found' });
+    return;
   }
 
-  const report = await prisma.IncidentReport.create({
-    data: { title, description, location, userId },
+  const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
+
+  const report = await prisma.incidentReport.create({
+    data: {
+      title,
+      description,
+      location,
+      userId,
+      imageUrl,
+    },
   });
 
   res.status(201).json({ message: 'Incident report created successfully', report });
-});
+};
+app.post('/api/reports', upload.single('image'), createReportHandler);
 
 // Fetch all incident reports endpoint
-app.get('/api/reports', async (req, res) => {
-  const reports = await prisma.IncidentReport.findMany({
-    include: { user: true }, // Include the user who created the report
-    orderBy: { createdAt: 'desc' }, // Sort by creation date (newest first)
+const getReportsHandler: AsyncRequestHandler = async (req, res) => {
+  const reports = await prisma.incidentReport.findMany({
+    include: { user: true },
+    orderBy: { createdAt: 'desc' },
   });
 
   res.json({ reports });
-});
+};
+app.get('/api/reports', getReportsHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
