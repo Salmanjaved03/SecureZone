@@ -64,6 +64,9 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
       if (responseData.user) {
         localStorage.setItem("userEmail", data.email);
         console.log("AuthPage.tsx: localStorage userEmail set to:", data.email);
+
+        // Always navigate to the homepage after login
+        console.log("AuthPage.tsx: Navigating to homepage (/options)");
         navigate("/options");
       }
     } catch (error: any) {
@@ -87,10 +90,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
   const handleAdminDashboard = async () => {
     if (!user) return;
     try {
-      const response: AxiosResponse<AuthResponse> = await getAdminDashboard(
-        user.email
-      );
-      setMessage(response.data.message);
+      await getAdminDashboard(user.email);
+      navigate("/admin-dashboard");
     } catch (error: any) {
       setMessage(
         error.response?.data?.message || "Failed to access admin dashboard"
@@ -101,10 +102,8 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
   const handleModeratorReports = async () => {
     if (!user) return;
     try {
-      const response: AxiosResponse<AuthResponse> = await getModeratorReports(
-        user.email
-      );
-      setMessage(response.data.message);
+      await getModeratorReports(user.email);
+      navigate("/moderator-reports");
     } catch (error: any) {
       setMessage(
         error.response?.data?.message || "Failed to access moderator reports"
@@ -358,32 +357,36 @@ const AuthPage: React.FC<AuthPageProps> = ({ user, setUser }) => {
             >
               View Profile
             </button>
-            <button
-              onClick={handleAdminDashboard}
-              style={{
-                margin: "0.5rem",
-                padding: "0.5rem 1rem",
-                backgroundColor: "#dc3545",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-              }}
-            >
-              Admin Dashboard
-            </button>
-            <button
-              onClick={handleModeratorReports}
-              style={{
-                margin: "0.5rem",
-                padding: "0.5rem 1rem",
-                backgroundColor: "#ffc107",
-                color: "black",
-                border: "none",
-                borderRadius: "4px",
-              }}
-            >
-              Moderator Reports
-            </button>
+            {user.role === "ADMIN" && (
+              <button
+                onClick={handleAdminDashboard}
+                style={{
+                  margin: "0.5rem",
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "#dc3545",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                }}
+              >
+                Admin Dashboard
+              </button>
+            )}
+            {user.role === "MODERATOR" && (
+              <button
+                onClick={handleModeratorReports}
+                style={{
+                  margin: "0.5rem",
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "#ffc107",
+                  color: "black",
+                  border: "none",
+                  borderRadius: "4px",
+                }}
+              >
+                Moderator Reports
+              </button>
+            )}
             <p style={{ marginTop: "0.5rem" }}>{message}</p>
           </div>
         )}

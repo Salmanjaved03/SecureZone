@@ -43,12 +43,10 @@ const App: React.FC = () => {
           }
         } catch (error: any) {
           console.error("App.tsx: getProfile error:", error);
-          // Only clear user state on authentication errors (e.g., 401 Unauthorized)
           if (error.response?.status === 401) {
             localStorage.removeItem("userEmail");
             setUser(null);
           }
-          // Otherwise, preserve the existing user state (don't set to null)
         } finally {
           setIsLoading(false);
         }

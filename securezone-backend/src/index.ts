@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { PrismaClient, User, IncidentReport } from '@prisma/client';
+import { PrismaClient, User, IncidentReport, Comment } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 
@@ -19,7 +19,7 @@ const prisma = new PrismaClient();
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, 'Uploads/');
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
@@ -42,11 +42,13 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
 });
 
+// Configure CORS to allow multiple origins
 app.use(cors({
-  origin: 'http://localhost:5173', // Update to match your frontend port
+  origin: 'http://localhost:3000',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
 app.use(express.json());
 
 // Serve static files from the uploads directory
@@ -87,7 +89,7 @@ const checkRole = (roles: string[]) => {
   };
 };
 
-// Middleware to check if user exists (for voting and profile updates)
+// Middleware to check if user exists (for voting, commenting, and profile updates)
 const checkUser = () => {
   return async (req: Request, res: Response, next: NextFunction) => {
     const { userEmail } = req.body;
@@ -247,6 +249,7 @@ app.post('/api/admin/ban-user', checkRole(['ADMIN']), banUserHandler);
 // Delete user endpoint
 const deleteUserHandler: AsyncRequestHandler = async (req, res) => {
   const { username } = req.body;
+  console.log(`deleteUser: Attempting to delete username=${username}`);
   const userToDelete: User | null = await prisma.user.findFirst({
     where: { username: username.toLowerCase() },
   });
@@ -258,12 +261,13 @@ const deleteUserHandler: AsyncRequestHandler = async (req, res) => {
   }
 
   if (userToDelete.role === 'ADMIN') {
+    console.log(`deleteUser: Cannot delete admin: username=${username}`);
     res.status(403).json({ message: 'Cannot delete an admin' });
     return;
   }
 
-  await prisma.incidentReport.deleteMany({ where: { userId: userToDelete.id } });
   await prisma.user.delete({ where: { id: userToDelete.id } });
+  console.log(`deleteUser: Successfully deleted username=${username}`);
 
   res.json({ message: `User ${username} has been deleted` });
 };
@@ -299,7 +303,7 @@ app.post('/api/admin/promote-to-moderator', checkRole(['ADMIN']), promoteToModer
 // Delete report endpoint
 const deleteReportHandler: AsyncRequestHandler = async (req, res) => {
   const { reportId } = req.params;
-  console.log(`deleteReport: reportId=${reportId}`);
+  console.log(`deleteReport: Attempting to delete reportId=${reportId}`);
   const report: IncidentReport | null = await prisma.incidentReport.findUnique({ where: { id: reportId } });
   if (!report) {
     console.log(`deleteReport: Report not found: reportId=${reportId}`);
@@ -308,6 +312,8 @@ const deleteReportHandler: AsyncRequestHandler = async (req, res) => {
   }
 
   await prisma.incidentReport.delete({ where: { id: reportId } });
+  console.log(`deleteReport: Successfully deleted reportId=${reportId}`);
+
   res.json({ message: 'Report deleted successfully' });
 };
 app.delete('/api/reports/:reportId', checkRole(['ADMIN', 'MODERATOR']), deleteReportHandler);
@@ -315,7 +321,7 @@ app.delete('/api/reports/:reportId', checkRole(['ADMIN', 'MODERATOR']), deleteRe
 // Flag report as false information endpoint
 const flagReportHandler: AsyncRequestHandler = async (req, res) => {
   const { reportId } = req.params;
-  console.log(`flagReport: reportId=${reportId}`);
+  console.log(`flagReport: Attempting to flag reportId=${reportId}`);
   const report: IncidentReport | null = await prisma.incidentReport.findUnique({ where: { id: reportId } });
   if (!report) {
     console.log(`flagReport: Report not found: reportId=${reportId}`);
@@ -331,6 +337,74 @@ const flagReportHandler: AsyncRequestHandler = async (req, res) => {
   res.json({ message: 'Report flagged as false information' });
 };
 app.put('/api/reports/:reportId/flag', checkRole(['ADMIN', 'MODERATOR']), flagReportHandler);
+
+// Create comment endpoint
+const createCommentHandler: AsyncRequestHandler = async (req, res) => {
+  const { reportId } = req.params;
+  const { userEmail, content } = req.body;
+  const user: User | undefined = req.user; // From checkUser middleware
+
+  if (!user) {
+    res.status(401).json({ message: 'User not authenticated' });
+    return;
+  }
+
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    console.log(`createComment: Invalid content for reportId=${reportId}, userEmail=${userEmail}`);
+    res.status(400).json({ message: 'Comment content is required' });
+    return;
+  }
+
+  console.log(`createComment: Creating comment for reportId=${reportId}, userEmail=${userEmail}`);
+
+  const report: IncidentReport | null = await prisma.incidentReport.findUnique({ where: { id: reportId } });
+  if (!report) {
+    console.log(`createComment: Report not found: reportId=${reportId}`);
+    res.status(404).json({ message: 'Report not found' });
+    return;
+  }
+
+  const comment: Comment = await prisma.comment.create({
+    data: {
+      content: content.trim(),
+      userId: user.id,
+      reportId,
+    },
+    include: { user: true },
+  });
+
+  res.status(201).json({ message: 'Comment created successfully', comment });
+};
+app.post('/api/reports/:reportId/comments', checkUser(), createCommentHandler);
+
+// Fetch comments endpoint
+const getCommentsHandler: AsyncRequestHandler = async (req, res) => {
+  const { reportId } = req.params;
+
+  const report: IncidentReport | null = await prisma.incidentReport.findUnique({ where: { id: reportId } });
+  if (!report) {
+    console.log(`getComments: Report not found: reportId=${reportId}`);
+    res.status(404).json({ message: 'Report not found' });
+    return;
+  }
+
+  const comments: (Comment & { user: User })[] = await prisma.comment.findMany({
+    where: { reportId },
+    include: { user: true },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const transformedComments = comments.map(comment => ({
+    ...comment,
+    user: {
+      id: comment.user.id,
+      username: comment.user.username,
+    },
+  }));
+
+  res.json({ comments: transformedComments });
+};
+app.get('/api/reports/:reportId/comments', getCommentsHandler);
 
 // Upvote report endpoint
 const upvoteReportHandler: AsyncRequestHandler = async (req, res) => {

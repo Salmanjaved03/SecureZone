@@ -48,19 +48,16 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
       try {
         if (user) {
           console.log(
-            `Fetching moderator reports for user: ${user.email}, role: ${user.role}`
+            `Fetching reports for user: ${user.email}, role: ${user.role}`
           );
           await getModeratorReports(user.email);
           const response = await getIncidentReports(user.email);
           console.log("Fetched reports:", response.data.reports);
-          setReports(response.data.reports);
+          setReports(response.data.reports || []);
         }
       } catch (error: any) {
-        console.error(
-          "Fetch data error:",
-          error.response?.data || error.message
-        );
-        setMessage(error.response?.data?.message || "Failed to fetch data");
+        console.error("Fetch error:", error.response?.data || error.message);
+        setMessage(error.response?.data?.message || "Failed to fetch reports");
       }
     };
     fetchData();
@@ -69,7 +66,7 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        closeImageModal();
+        setSelectedImage(null);
       }
     };
 
@@ -86,7 +83,7 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
     return <Navigate to="/" />;
   }
 
-  if (user.role !== "MODERATOR") {
+  if (user.role !== "MODERATOR" && user.role !== "ADMIN") {
     return <Navigate to="/options" />;
   }
 
@@ -136,7 +133,10 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
   };
 
   const openImageModal = (imageUrl: string) => {
-    setSelectedImage(imageUrl);
+    const fullImageUrl = imageUrl.startsWith("http")
+      ? imageUrl
+      : `${BASE_URL}${imageUrl}`;
+    setSelectedImage(fullImageUrl);
   };
 
   const closeImageModal = () => {
@@ -168,7 +168,7 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
           onClick={handleLogout}
           style={{
             display: "block",
-            margin: "0 auto 2rem",
+            margin: "0 auto 1rem",
             padding: "0.5rem 1rem",
             backgroundColor: "#007bff",
             color: "white",
@@ -195,7 +195,6 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
           Back to User Options
         </button>
 
-        {/* Incident Reports Timeline */}
         <div>
           <h3
             style={{
@@ -205,11 +204,11 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
               textAlign: "center",
             }}
           >
-            Incident Reports Timeline
+            Incident Reports
           </h3>
           {reports.length === 0 ? (
             <p style={{ textAlign: "center", color: "#666" }}>
-              No incident reports yet.
+              No incident reports available.
             </p>
           ) : (
             reports.map((report) => (
@@ -239,11 +238,13 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
                     marginBottom: "0.5rem",
                   }}
                 >
-                  Reported by {report.user.username} on{" "}
+                  Reported by{" "}
+                  {report.isAnonymous ? "Anonymous" : report.user.username} on{" "}
                   {new Date(report.createdAt).toLocaleString()}
                 </p>
                 <p style={{ marginBottom: "0.5rem" }}>
-                  <strong>Location:</strong> {report.location}
+                  <strong>Location:</strong>{" "}
+                  {report.location || "Not specified"}
                 </p>
                 <p style={{ marginBottom: "0.5rem" }}>{report.description}</p>
                 {report.isFlagged && (
@@ -263,7 +264,11 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
                       <strong>Image:</strong>
                     </p>
                     <img
-                      src={`${BASE_URL}${report.imageUrl}`}
+                      src={
+                        report.imageUrl.startsWith("http")
+                          ? report.imageUrl
+                          : `${BASE_URL}${report.imageUrl}`
+                      }
                       alt="Incident report"
                       style={{
                         maxWidth: "100%",
@@ -271,9 +276,7 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
                         borderRadius: "4px",
                         cursor: "pointer",
                       }}
-                      onClick={() =>
-                        openImageModal(`${BASE_URL}${report.imageUrl}`)
-                      }
+                      onClick={() => openImageModal(report.imageUrl!)}
                     />
                   </div>
                 )}
@@ -326,7 +329,6 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
         )}
       </div>
 
-      {/* Modal for enlarged image */}
       {selectedImage && (
         <div
           style={{

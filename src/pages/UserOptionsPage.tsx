@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { getAdminDashboard } from "../services/api";
 
 interface User {
   id: string;
@@ -16,6 +17,7 @@ interface UserOptionsPageProps {
 
 const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
   const navigate = useNavigate();
+  const [message, setMessage] = React.useState<string>("");
 
   const handleLogout = async () => {
     localStorage.removeItem("userEmail");
@@ -51,6 +53,18 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
       navigate("/reports-timeline");
     } else {
       navigate("/");
+    }
+  };
+
+  const handleAdminDashboard = async () => {
+    if (!user) return;
+    try {
+      await getAdminDashboard(user.email);
+      navigate("/admin-dashboard");
+    } catch (error: any) {
+      setMessage(
+        error.response?.data?.message || "Failed to access admin dashboard"
+      );
     }
   };
 
@@ -105,6 +119,23 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
         >
           View Profile
         </button>
+        {user.role === "ADMIN" && (
+          <button
+            onClick={handleAdminDashboard}
+            style={{
+              width: "100%",
+              padding: "0.75rem",
+              marginBottom: "1rem",
+              backgroundColor: "#dc3545",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Admin Dashboard
+          </button>
+        )}
         <button
           onClick={handleCreateIncidentReport}
           style={{
@@ -149,6 +180,16 @@ const UserOptionsPage: React.FC<UserOptionsPageProps> = ({ user, setUser }) => {
         >
           Logout
         </button>
+        {message && (
+          <p
+            style={{
+              marginTop: "1rem",
+              color: message.includes("success") ? "green" : "red",
+            }}
+          >
+            {message}
+          </p>
+        )}
       </div>
     </div>
   );

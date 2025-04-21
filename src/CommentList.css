@@ -1,0 +1,51 @@
+.comment-list {
+    margin-top: 15px;
+    padding: 10px;
+    border-top: 1px solid #ddd;
+  }
+  
+  .comment-list h4 {
+    margin: 0 0 10px;
+    font-size: 1.2em;
+  }
+  
+  .comment {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .comment p {
+    margin: 5px 0;
+  }
+  
+  .comment-form {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  
+  .comment-input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+  }
+  
+  .comment-submit {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 4px;
+    background-color: #28a745;
+    color: white;
+    cursor: pointer;
+  }
+  
+  .comment-submit:hover {
+    background-color: #218838;
+  }
+  
+  .error {
+    color: red;
+    margin-bottom: 10px;
+  }

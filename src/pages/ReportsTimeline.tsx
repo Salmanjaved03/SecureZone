@@ -5,9 +5,13 @@ import {
   IncidentReport,
   upvoteReport,
   downvoteReport,
+  deleteReport,
+  flagReport,
   VoteResponse,
 } from "../services/api";
 import { AxiosResponse } from "axios";
+import CommentList from "./CommentList";
+import styles from "./ReportsTimeline.module.css";
 
 interface User {
   id: string;
@@ -29,8 +33,10 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
   const [votedReports, setVotedReports] = useState<{
     [key: string]: "upvote" | "downvote" | null;
   }>({});
+  const [openCommentsReportId, setOpenCommentsReportId] = useState<
+    string | null
+  >(null);
 
-  // Base URL for the backend server
   const BASE_URL = "http://localhost:5000";
 
   useEffect(() => {
@@ -45,12 +51,32 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
           await getIncidentReports(user.email);
         setReports(response.data.reports || []);
       } catch (error: any) {
+        console.error(
+          "Fetch reports error:",
+          error.response?.data || error.message
+        );
         setMessage("Failed to fetch reports");
       }
     };
 
     fetchReports();
   }, [user, navigate]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedImage(null);
+      }
+    };
+
+    if (selectedImage) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedImage]);
 
   const handleLogout = () => {
     localStorage.removeItem("userEmail");
@@ -72,7 +98,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
         user.email,
         reportId
       );
-      console.log("Upvote response:", response);
+      console.log("Upvote response:", response.data);
       const updatedReport = response.data.report;
       const responseMessage = response.data.message;
 
@@ -111,7 +137,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
         user.email,
         reportId
       );
-      console.log("Downvote response:", response);
+      console.log("Downvote response:", response.data);
       const updatedReport = response.data.report;
       const responseMessage = response.data.message;
 
@@ -140,6 +166,57 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
     }
   };
 
+  const handleDeleteReport = async (reportId: string) => {
+    if (!user) {
+      setMessage("User not authenticated");
+      return;
+    }
+    try {
+      console.log(
+        `Deleting report: reportId=${reportId}, adminEmail=${user.email}`
+      );
+      const response = await deleteReport(user.email, reportId);
+      console.log("Delete report response:", response.data);
+      setReports(reports.filter((report) => report.id !== reportId));
+      setMessage(response.data.message);
+      if (openCommentsReportId === reportId) {
+        setOpenCommentsReportId(null);
+      }
+    } catch (error: any) {
+      console.error(
+        "Delete report error:",
+        error.response?.data || error.message
+      );
+      setMessage(error.response?.data?.message || "Failed to delete report");
+    }
+  };
+
+  const handleFlagReport = async (reportId: string) => {
+    if (!user) {
+      setMessage("User not authenticated");
+      return;
+    }
+    try {
+      console.log(
+        `Flagging report: reportId=${reportId}, adminEmail=${user.email}`
+      );
+      const response = await flagReport(user.email, reportId);
+      console.log("Flag report response:", response.data);
+      setReports(
+        reports.map((report) =>
+          report.id === reportId ? { ...report, isFlagged: true } : report
+        )
+      );
+      setMessage(response.data.message);
+    } catch (error: any) {
+      console.error(
+        "Flag report error:",
+        error.response?.data || error.message
+      );
+      setMessage(error.response?.data?.message || "Failed to flag report");
+    }
+  };
+
   const openImageModal = (imageUrl: string) => {
     const fullImageUrl = imageUrl.startsWith("http")
       ? imageUrl
@@ -149,6 +226,12 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
 
   const closeImageModal = () => {
     setSelectedImage(null);
+  };
+
+  const toggleComments = (reportId: string) => {
+    setOpenCommentsReportId(
+      openCommentsReportId === reportId ? null : reportId
+    );
   };
 
   return (
@@ -316,6 +399,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                   alignItems: "center",
                   gap: "0.5rem",
                   marginTop: "0.5rem",
+                  flexWrap: "wrap",
                 }}
               >
                 <button
@@ -339,7 +423,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                     fill="none"
                     stroke={
                       votedReports[report.id] === "upvote" ? "#FF4500" : "#777"
-                    } // Orange for upvote
+                    }
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -373,7 +457,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                       votedReports[report.id] === "downvote"
                         ? "#1E90FF"
                         : "#777"
-                    } // Blue for downvote
+                    }
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -381,6 +465,60 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                     <path d="M12 19l7-7h-5v-7h-4v7h-5l7 7z" />
                   </svg>
                 </button>
+                <button
+                  onClick={() => toggleComments(report.id)}
+                  style={{
+                    padding: "0.25rem 0.5rem",
+                    backgroundColor:
+                      openCommentsReportId === report.id
+                        ? "#6c757d"
+                        : "#28a745",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  {openCommentsReportId === report.id
+                    ? "Hide Comments"
+                    : "Show Comments"}
+                </button>
+                {user &&
+                  (user.role === "ADMIN" || user.role === "MODERATOR") && (
+                    <>
+                      <button
+                        onClick={() => handleDeleteReport(report.id)}
+                        style={{
+                          padding: "0.25rem 0.5rem",
+                          backgroundColor: "#dc3545",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "4px",
+                          cursor: "pointer",
+                          fontSize: "0.875rem",
+                        }}
+                      >
+                        Delete
+                      </button>
+                      {!report.isFlagged && (
+                        <button
+                          onClick={() => handleFlagReport(report.id)}
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            backgroundColor: "#ff9800",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontSize: "0.875rem",
+                          }}
+                        >
+                          Flag
+                        </button>
+                      )}
+                    </>
+                  )}
               </div>
               {report.isFlagged && (
                 <p
@@ -390,15 +528,17 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                     marginTop: "0.25rem",
                   }}
                 >
-                  <em>Flagged: Yes</em>
+                  <em>Flagged as False</em>
                 </p>
+              )}
+              {openCommentsReportId === report.id && user && (
+                <CommentList reportId={report.id} userEmail={user.email} />
               )}
             </div>
           ))
         )}
       </div>
 
-      {/* Modal for Enlarged Image */}
       {selectedImage && (
         <div
           style={{
@@ -415,32 +555,39 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
           }}
           onClick={closeImageModal}
         >
-          <img
-            src={selectedImage}
-            alt="Enlarged Incident"
+          <div
             style={{
+              position: "relative",
               maxWidth: "90%",
               maxHeight: "90%",
-              objectFit: "contain",
-              borderRadius: "8px",
             }}
-          />
-          <button
-            style={{
-              position: "absolute",
-              top: "20px",
-              right: "20px",
-              backgroundColor: "#dc3545",
-              color: "white",
-              border: "none",
-              borderRadius: "4px",
-              padding: "0.5rem 1rem",
-              cursor: "pointer",
-            }}
-            onClick={closeImageModal}
+            onClick={(e) => e.stopPropagation()}
           >
-            Close
-          </button>
+            <button
+              style={{
+                position: "absolute",
+                top: "-30px",
+                right: "-30px",
+                background: "none",
+                border: "none",
+                color: "white",
+                fontSize: "2rem",
+                cursor: "pointer",
+              }}
+              onClick={closeImageModal}
+            >
+              ×
+            </button>
+            <img
+              src={selectedImage}
+              alt="Enlarged incident report"
+              style={{
+                maxWidth: "100%",
+                maxHeight: "80vh",
+                borderRadius: "8px",
+              }}
+            />
+          </div>
         </div>
       )}
     </div>

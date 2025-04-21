@@ -66,7 +66,7 @@ const checkRole = (roles) => {
         next();
     };
 };
-// Middleware to check if user exists (for voting)
+// Middleware to check if user exists (for voting and profile updates)
 const checkUser = () => {
     return async (req, res, next) => {
         const { userEmail } = req.body;
@@ -81,6 +81,11 @@ const checkUser = () => {
             res.status(404).json({ message: 'User not found' });
             return;
         }
+        if (user.isBanned) {
+            console.log(`checkUser: User is banned, email=${userEmail}`);
+            res.status(403).json({ message: 'Your account has been banned' });
+            return;
+        }
         req.user = user; // Attach user to the request
         next();
     };
@@ -88,15 +93,12 @@ const checkUser = () => {
 // Login endpoint
 const loginHandler = async (req, res) => {
     const { email, password } = req.body;
-    console.log(`Login attempt: email=${email}`);
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user || user.password !== password) {
-        console.log(`Login failed: Invalid email or password for email=${email}`);
         res.status(401).json({ message: 'Invalid email or password' });
         return;
     }
     if (user.isBanned) {
-        console.log(`Login failed: User banned for email=${email}`);
         res.status(403).json({ message: 'Your account has been banned' });
         return;
     }
@@ -106,10 +108,8 @@ app.post('/api/login', loginHandler);
 // Signup endpoint
 const signupHandler = async (req, res) => {
     const { email, password, username } = req.body;
-    console.log(`Signup attempt: email=${email}, username=${username}`);
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-        console.log(`Signup failed: Email already exists for email=${email}`);
         res.status(400).json({ message: 'Email already exists' });
         return;
     }
@@ -121,21 +121,56 @@ const signupHandler = async (req, res) => {
 app.post('/api/signup', signupHandler);
 // Profile endpoint
 const profileHandler = async (req, res) => {
-    const user = await prisma.user.findUnique({ where: { email: req.params.email } });
+    const { email } = req.params;
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-        console.log(`Profile not found: email=${req.params.email}`);
         res.status(404).json({ message: 'User not found' });
         return;
     }
     res.json({ message: `Profile for ${user.username}`, user });
 };
 app.get('/api/profile/:email', profileHandler);
+// Update profile endpoint
+const updateProfileHandler = async (req, res) => {
+    const { email } = req.params;
+    const { username, password } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+        res.status(404).json({ message: 'User not found' });
+        return;
+    }
+    if (user.isBanned) {
+        res.status(403).json({ message: 'Your account has been banned' });
+        return;
+    }
+    // Check if the new username is unique (if changed)
+    if (username && username.toLowerCase() !== user.username.toLowerCase()) {
+        const existingUserWithUsername = await prisma.user.findFirst({
+            where: { username: username.toLowerCase() },
+        });
+        if (existingUserWithUsername) {
+            res.status(400).json({ message: 'Username already taken' });
+            return;
+        }
+    }
+    // Update user data
+    const updatedData = {};
+    if (username)
+        updatedData.username = username.toLowerCase();
+    if (password)
+        updatedData.password = password;
+    const updatedUser = await prisma.user.update({
+        where: { email },
+        data: updatedData,
+    });
+    res.json({ message: 'Profile updated successfully', user: updatedUser });
+};
+app.put('/api/profile/:email', updateProfileHandler);
 // Admin dashboard endpoint
 const adminDashboardHandler = async (req, res) => {
     const { adminEmail } = req.body;
     const user = await prisma.user.findUnique({ where: { email: adminEmail } });
     if (!user) {
-        console.log(`Admin dashboard: User not found for email=${adminEmail}`);
         res.status(404).json({ message: 'User not found' });
         return;
     }
@@ -154,7 +189,6 @@ const banUserHandler = async (req, res) => {
         return;
     }
     if (userToBan.role === 'ADMIN') {
-        console.log(`banUser: Cannot ban admin: username=${username}`);
         res.status(403).json({ message: 'Cannot ban an admin' });
         return;
     }
@@ -177,7 +211,6 @@ const deleteUserHandler = async (req, res) => {
         return;
     }
     if (userToDelete.role === 'ADMIN') {
-        console.log(`deleteUser: Cannot delete admin: username=${username}`);
         res.status(403).json({ message: 'Cannot delete an admin' });
         return;
     }
@@ -198,7 +231,6 @@ const promoteToModeratorHandler = async (req, res) => {
         return;
     }
     if (userToPromote.role === 'ADMIN') {
-        console.log(`promoteToModerator: Cannot change admin role: username=${username}`);
         res.status(403).json({ message: 'Cannot change admin role' });
         return;
     }
@@ -261,17 +293,19 @@ const upvoteReportHandler = async (req, res) => {
             userId_reportId: { userId: user.id, reportId },
         },
     });
+    let updatedReport;
     if (existingVote) {
         if (existingVote.voteType === 'UPVOTE') {
             // User already upvoted, remove the vote
             await prisma.vote.delete({
                 where: { id: existingVote.id },
             });
-            await prisma.incidentReport.update({
+            updatedReport = await prisma.incidentReport.update({
                 where: { id: reportId },
                 data: { upvotes: { decrement: 1 } },
+                include: { user: true },
             });
-            res.json({ message: 'Upvote removed', upvotes: report.upvotes - 1, downvotes: report.downvotes });
+            res.json({ message: 'Upvote removed', report: updatedReport });
         }
         else if (existingVote.voteType === 'DOWNVOTE') {
             // User previously downvoted, switch to upvote
@@ -279,14 +313,20 @@ const upvoteReportHandler = async (req, res) => {
                 where: { id: existingVote.id },
                 data: { voteType: 'UPVOTE' },
             });
-            await prisma.incidentReport.update({
+            updatedReport = await prisma.incidentReport.update({
                 where: { id: reportId },
                 data: {
                     upvotes: { increment: 1 },
                     downvotes: { decrement: 1 },
                 },
+                include: { user: true },
             });
-            res.json({ message: 'Changed to upvote', upvotes: report.upvotes + 1, downvotes: report.downvotes - 1 });
+            res.json({ message: 'Changed to upvote', report: updatedReport });
+        }
+        else {
+            // This should not happen unless voteType is invalid
+            res.status(400).json({ message: 'Invalid vote type' });
+            return;
         }
     }
     else {
@@ -298,11 +338,12 @@ const upvoteReportHandler = async (req, res) => {
                 voteType: 'UPVOTE',
             },
         });
-        await prisma.incidentReport.update({
+        updatedReport = await prisma.incidentReport.update({
             where: { id: reportId },
             data: { upvotes: { increment: 1 } },
+            include: { user: true },
         });
-        res.json({ message: 'Report upvoted', upvotes: report.upvotes + 1, downvotes: report.downvotes });
+        res.json({ message: 'Report upvoted', report: updatedReport });
     }
 };
 app.post('/api/reports/:reportId/upvote', checkUser(), upvoteReportHandler);
@@ -327,17 +368,19 @@ const downvoteReportHandler = async (req, res) => {
             userId_reportId: { userId: user.id, reportId },
         },
     });
+    let updatedReport;
     if (existingVote) {
         if (existingVote.voteType === 'DOWNVOTE') {
             // User already downvoted, remove the vote
             await prisma.vote.delete({
                 where: { id: existingVote.id },
             });
-            await prisma.incidentReport.update({
+            updatedReport = await prisma.incidentReport.update({
                 where: { id: reportId },
                 data: { downvotes: { decrement: 1 } },
+                include: { user: true },
             });
-            res.json({ message: 'Downvote removed', upvotes: report.upvotes, downvotes: report.downvotes - 1 });
+            res.json({ message: 'Downvote removed', report: updatedReport });
         }
         else if (existingVote.voteType === 'UPVOTE') {
             // User previously upvoted, switch to downvote
@@ -345,14 +388,20 @@ const downvoteReportHandler = async (req, res) => {
                 where: { id: existingVote.id },
                 data: { voteType: 'DOWNVOTE' },
             });
-            await prisma.incidentReport.update({
+            updatedReport = await prisma.incidentReport.update({
                 where: { id: reportId },
                 data: {
                     upvotes: { decrement: 1 },
                     downvotes: { increment: 1 },
                 },
+                include: { user: true },
             });
-            res.json({ message: 'Changed to downvote', upvotes: report.upvotes - 1, downvotes: report.downvotes + 1 });
+            res.json({ message: 'Changed to downvote', report: updatedReport });
+        }
+        else {
+            // This should not happen unless voteType is invalid
+            res.status(400).json({ message: 'Invalid vote type' });
+            return;
         }
     }
     else {
@@ -364,11 +413,12 @@ const downvoteReportHandler = async (req, res) => {
                 voteType: 'DOWNVOTE',
             },
         });
-        await prisma.incidentReport.update({
+        updatedReport = await prisma.incidentReport.update({
             where: { id: reportId },
             data: { downvotes: { increment: 1 } },
+            include: { user: true },
         });
-        res.json({ message: 'Report downvoted', upvotes: report.upvotes, downvotes: report.downvotes + 1 });
+        res.json({ message: 'Report downvoted', report: updatedReport });
     }
 };
 app.post('/api/reports/:reportId/downvote', checkUser(), downvoteReportHandler);
@@ -377,7 +427,6 @@ const moderatorReportsHandler = async (req, res) => {
     const { adminEmail } = req.body;
     const user = await prisma.user.findUnique({ where: { email: adminEmail } });
     if (!user) {
-        console.log(`Moderator reports: User not found for email=${adminEmail}`);
         res.status(404).json({ message: 'User not found' });
         return;
     }
@@ -428,6 +477,7 @@ const getReportsHandler = async (req, res) => {
         res.status(404).json({ message: 'Requesting user not found' });
         return;
     }
+    // Explicitly type the reports to include the user relation
     const reports = await prisma.incidentReport.findMany({
         include: { user: true },
         orderBy: { createdAt: 'desc' },

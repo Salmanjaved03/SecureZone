@@ -20,40 +20,50 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   email     String   @unique
+  username  String   @unique
   password  String
-  username  String
-  role      String   @default("NORMAL")
+  role      String
   isBanned  Boolean  @default(false)
   reports   IncidentReport[]
   votes     Vote[]
-  createdAt DateTime @default(now())
+  comments  Comment[]
 }
 
 model IncidentReport {
-  id          String   @id @default(uuid())
+  id          String   @id @default(cuid())
   title       String
   description String
   location    String
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   imageUrl    String?
   isAnonymous Boolean  @default(false)
   isFlagged   Boolean  @default(false)
   upvotes     Int      @default(0)
   downvotes   Int      @default(0)
-  votes       Vote[]
   createdAt   DateTime @default(now())
+  votes       Vote[]
+  comments    Comment[]
 }
 
 model Vote {
-  id        String   @id @default(uuid())
+  id        String   @id @default(cuid())
   userId    String
   reportId  String
-  voteType  String   // "UPVOTE" or "DOWNVOTE"
-  user      User     @relation(fields: [userId], references: [id])
-  report    IncidentReport @relation(fields: [reportId], references: [id])
-  createdAt DateTime @default(now())
+  voteType  String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report    IncidentReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   @@unique([userId, reportId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  userId    String
+  reportId  String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  report    IncidentReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
