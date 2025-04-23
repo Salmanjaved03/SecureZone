@@ -31,23 +31,6 @@ model User {
   comments  Comment[]
 }
 
-model IncidentReport {
-  id          String   @id @default(cuid())
-  title       String
-  description String
-  location    String
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  imageUrl    String?
-  isAnonymous Boolean  @default(false)
-  isFlagged   Boolean  @default(false)
-  upvotes     Int      @default(0)
-  downvotes   Int      @default(0)
-  createdAt   DateTime @default(now())
-  votes       Vote[]
-  comments    Comment[]
-}
-
 model Vote {
   id        String   @id @default(cuid())
   userId    String
@@ -66,4 +49,29 @@ model Comment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   report    IncidentReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+}
+
+model IncidentReport {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  location    String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageUrl    String?
+  isAnonymous Boolean  @default(false)
+  isFlagged   Boolean  @default(false)
+  upvotes     Int      @default(0)
+  downvotes   Int      @default(0)
+  createdAt   DateTime @default(now())
+  tags        Tag[]
+  votes       Vote[]
+  comments    Comment[]
+}
+
+model Tag {
+  id              Int             @id @default(autoincrement())
+  name            String
+  incidentReport  IncidentReport? @relation(fields: [incidentReportId], references: [id])
+  incidentReportId String?
 }

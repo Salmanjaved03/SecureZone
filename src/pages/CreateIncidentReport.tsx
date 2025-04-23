@@ -8,8 +8,9 @@ interface IncidentFormData {
   title: string;
   description: string;
   location: string;
-  image: FileList | undefined; // Updated type to FileList
+  image: FileList | undefined;
   isAnonymous?: boolean;
+  tags: string; // Comma-separated tags
 }
 
 interface CreateIncidentReportProps {
@@ -48,6 +49,15 @@ const CreateIncidentReport: React.FC<CreateIncidentReportProps> = ({
       }
     }
 
+    // Validate tags
+    if (data.tags && data.tags.trim().length === 0) {
+      setError("tags", {
+        type: "manual",
+        message: "Tags cannot be empty if provided",
+      });
+      return;
+    }
+
     try {
       const response: AxiosResponse<CreateReportResponse> =
         await createIncidentReport(
@@ -56,7 +66,8 @@ const CreateIncidentReport: React.FC<CreateIncidentReportProps> = ({
           data.location || "",
           user.id,
           data.image && data.image.length > 0 ? data.image[0] : undefined,
-          data.isAnonymous || false
+          data.isAnonymous || false,
+          data.tags // Pass tags as comma-separated string
         );
       setMessage(
         response.data.message || "Incident report created successfully!"
@@ -191,7 +202,7 @@ const CreateIncidentReport: React.FC<CreateIncidentReportProps> = ({
           <input
             id="location"
             type="text"
-            {...register("location")}
+            {...register("location", { required: "Location is required" })}
             style={{
               width: "100%",
               padding: "0.5rem",
@@ -200,6 +211,53 @@ const CreateIncidentReport: React.FC<CreateIncidentReportProps> = ({
               fontSize: "1rem",
             }}
           />
+          {errors.location && (
+            <p
+              style={{
+                color: "red",
+                fontSize: "0.75rem",
+                marginTop: "0.25rem",
+              }}
+            >
+              {errors.location.message}
+            </p>
+          )}
+        </div>
+        <div>
+          <label
+            htmlFor="tags"
+            style={{
+              display: "block",
+              fontSize: "0.875rem",
+              fontWeight: "500",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Tags (optional, comma-separated, e.g., Safety,Urgent)
+          </label>
+          <input
+            id="tags"
+            type="text"
+            {...register("tags")}
+            style={{
+              width: "100%",
+              padding: "0.5rem",
+              border: "1px solid #ccc",
+              borderRadius: "4px",
+              fontSize: "1rem",
+            }}
+          />
+          {errors.tags && (
+            <p
+              style={{
+                color: "red",
+                fontSize: "0.75rem",
+                marginTop: "0.25rem",
+              }}
+            >
+              {errors.tags.message}
+            </p>
+          )}
         </div>
         <div>
           <label

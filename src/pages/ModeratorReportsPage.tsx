@@ -53,7 +53,20 @@ const ModeratorReportsPage: React.FC<ModeratorReportsPageProps> = ({
           await getModeratorReports(user.email);
           const response = await getIncidentReports(user.email);
           console.log("Fetched reports:", response.data.reports);
-          setReports(response.data.reports || []);
+          setReports(
+            (response.data.reports || []).map((report: any) => ({
+              id: report.id,
+              title: report.title,
+              description: report.description,
+              location: report.location,
+              userId: report.userId || "",
+              createdAt: report.createdAt,
+              user: report.user,
+              imageUrl: report.imageUrl,
+              isAnonymous: report.isAnonymous,
+              isFlagged: report.isFlagged,
+            }))
+          );
         }
       } catch (error: any) {
         console.error("Fetch error:", error.response?.data || error.message);

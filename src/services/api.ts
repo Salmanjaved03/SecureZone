@@ -2,12 +2,18 @@ import axios, { AxiosResponse } from 'axios';
 
 const API_URL = 'http://localhost:5000/api';
 
-// Interfaces
 export interface User {
   id: string;
+  email: string;
   username: string;
   role: string;
-  email: string;
+  isBanned: boolean;
+}
+
+export interface Tag {
+  id: number;
+  name: string;
+  incidentReportId?: string;
 }
 
 export interface IncidentReport {
@@ -15,14 +21,14 @@ export interface IncidentReport {
   title: string;
   description: string;
   location: string;
-  userId: string;
-  createdAt: string;
-  user: User;
   imageUrl?: string;
-  isAnonymous?: boolean;
-  isFlagged?: boolean;
+  isAnonymous: boolean;
+  isFlagged: boolean;
   upvotes: number;
   downvotes: number;
+  createdAt: string;
+  user: User;
+  tags: Tag[];
 }
 
 export interface Comment {
@@ -81,7 +87,11 @@ export interface CommentsResponse {
   comments: Comment[];
 }
 
-// API Functions
+export interface UpdateTagsResponse {
+  message: string;
+  report: IncidentReport;
+}
+
 export const login = async (email: string, password: string): Promise<AxiosResponse<AuthResponse>> => {
   return await axios.post(`${API_URL}/login`, { email, password });
 };
@@ -92,6 +102,13 @@ export const signup = async (email: string, password: string, username: string):
 
 export const getProfile = async (email: string): Promise<AxiosResponse<ProfileResponse>> => {
   return await axios.get(`${API_URL}/profile/${email}`);
+};
+
+export const updateProfile = async (
+  email: string,
+  data: { username: string; password?: string }
+): Promise<AxiosResponse<ProfileResponse>> => {
+  return await axios.put(`${API_URL}/profile/${email}`, { ...data, userEmail: email });
 };
 
 export const getAdminDashboard = async (adminEmail: string): Promise<AxiosResponse<AdminDashboardResponse>> => {
@@ -110,20 +127,21 @@ export const promoteToModerator = async (adminEmail: string, username: string): 
   return await axios.post(`${API_URL}/admin/promote-to-moderator`, { adminEmail, username });
 };
 
-export const deleteReport = async (adminEmail: string, reportId: string): Promise<AxiosResponse<ActionResponse>> => {
-  return await axios.delete(`${API_URL}/reports/${reportId}`, { data: { adminEmail } });
-};
-
-export const flagReport = async (adminEmail: string, reportId: string): Promise<AxiosResponse<ActionResponse>> => {
-  return await axios.put(`${API_URL}/reports/${reportId}/flag`, { adminEmail });
-};
-
 export const getModeratorReports = async (adminEmail: string): Promise<AxiosResponse<ModeratorReportsResponse>> => {
   return await axios.post(`${API_URL}/moderator-reports`, { adminEmail });
 };
 
-export const getIncidentReports = async (userEmail: string): Promise<AxiosResponse<IncidentReportsResponse>> => {
+export const getIncidentReports = async (
+  userEmail: string
+): Promise<AxiosResponse<IncidentReportsResponse>> => {
   return await axios.get(`${API_URL}/reports`, { params: { userEmail } });
+};
+
+export const searchIncidentReports = async (
+  userEmail: string,
+  query: string
+): Promise<AxiosResponse<IncidentReportsResponse>> => {
+  return await axios.get(`${API_URL}/reports/search`, { params: { userEmail, query } });
 };
 
 export const createIncidentReport = async (
@@ -132,39 +150,106 @@ export const createIncidentReport = async (
   location: string,
   userId: string,
   image?: File,
-  isAnonymous: boolean = false
+  isAnonymous?: boolean,
+  tags?: string
 ): Promise<AxiosResponse<CreateReportResponse>> => {
   const formData = new FormData();
   formData.append('title', title);
   formData.append('description', description);
   formData.append('location', location);
   formData.append('userId', userId);
-  formData.append('isAnonymous', String(isAnonymous));
   if (image) {
     formData.append('image', image);
   }
+  formData.append('isAnonymous', isAnonymous ? 'true' : 'false');
+  if (tags) {
+    formData.append('tags', tags);
+  }
 
   return await axios.post(`${API_URL}/reports`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
   });
 };
 
-export const upvoteReport = async (userEmail: string, reportId: string): Promise<AxiosResponse<VoteResponse>> => {
+export const getIncidentReport = async (
+  reportId: string
+): Promise<AxiosResponse<{ report: IncidentReport }>> => {
+  return await axios.get(`${API_URL}/reports/${reportId}`);
+};
+
+export const updateIncidentReportTags = async (
+  reportId: string,
+  userEmail: string,
+  tags?: string
+): Promise<AxiosResponse<UpdateTagsResponse>> => {
+  return await axios.put(
+    `http://localhost:5000/api/reports/${reportId}/tags`,
+    { userEmail, tags },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+};
+
+export const deleteReport = async (
+  adminEmail: string,
+  reportId: string
+): Promise<AxiosResponse<ActionResponse>> => {
+  return await axios.delete(`${API_URL}/reports/${reportId}`, { data: { adminEmail } });
+};
+
+export const flagReport = async (
+  adminEmail: string,
+  reportId: string
+): Promise<AxiosResponse<ActionResponse>> => {
+  return await axios.put(`${API_URL}/reports/${reportId}/flag`, { adminEmail });
+};
+
+export const upvoteReport = async (
+  userEmail: string,
+  reportId: string
+): Promise<AxiosResponse<VoteResponse>> => {
   return await axios.post(`${API_URL}/reports/${reportId}/upvote`, { userEmail });
 };
 
-export const downvoteReport = async (userEmail: string, reportId: string): Promise<AxiosResponse<VoteResponse>> => {
+export const downvoteReport = async (
+  userEmail: string,
+  reportId: string
+): Promise<AxiosResponse<VoteResponse>> => {
   return await axios.post(`${API_URL}/reports/${reportId}/downvote`, { userEmail });
 };
 
-export const updateProfile = async (email: string, data: { username: string; password?: string }): Promise<AxiosResponse<ProfileResponse>> => {
-  return await axios.put(`${API_URL}/profile/${email}`, { ...data, userEmail: email });
-};
-
-export const createComment = async (userEmail: string, reportId: string, content: string): Promise<AxiosResponse<CreateCommentResponse>> => {
+export const createComment = async (
+  userEmail: string,
+  reportId: string,
+  content: string
+): Promise<AxiosResponse<CreateCommentResponse>> => {
   return await axios.post(`${API_URL}/reports/${reportId}/comments`, { userEmail, content });
 };
 
-export const getComments = async (reportId: string): Promise<AxiosResponse<CommentsResponse>> => {
+export const getComments = async (
+  reportId: string
+): Promise<AxiosResponse<CommentsResponse>> => {
   return await axios.get(`${API_URL}/reports/${reportId}/comments`);
 };
+
+export const updateReportTags = async (
+  userEmail: string,
+  reportId: string,
+  tags: string
+): Promise<AxiosResponse<UpdateTagsResponse>> => {
+  return await axios.put(
+    `http://localhost:5000/api/reports/${reportId}/tags`,
+    { userEmail, tags },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+};
+

@@ -1,8 +1,9 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { PrismaClient, User, IncidentReport, Comment } from '@prisma/client';
+import { PrismaClient, User, IncidentReport, Comment, Tag } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 
 // Extend Express Request type directly in this file
 declare global {
@@ -113,6 +114,54 @@ const checkUser = () => {
     }
 
     req.user = user; // Attach user to the request
+    next();
+  };
+};
+
+// Middleware to check if user is report owner or has role
+const checkReportOwnerOrRole = (roles: string[]) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const { userEmail } = req.body;
+    const { reportId } = req.params;
+
+    if (!userEmail) {
+      console.log('checkReportOwnerOrRole: userEmail is missing');
+      res.status(400).json({ message: 'User email is required' });
+      return;
+    }
+
+    const user: User | null = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) {
+      console.log(`checkReportOwnerOrRole: User not found for email=${userEmail}`);
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    if (user.isBanned) {
+      console.log(`checkReportOwnerOrRole: User is banned, email=${userEmail}`);
+      res.status(403).json({ message: 'Your account has been banned' });
+      return;
+    }
+
+    const report: IncidentReport | null = await prisma.incidentReport.findUnique({
+      where: { id: reportId },
+    });
+    if (!report) {
+      console.log(`checkReportOwnerOrRole: Report not found: reportId=${reportId}`);
+      res.status(404).json({ message: 'Report not found' });
+      return;
+    }
+
+    const isOwner = report.userId === user.id;
+    const hasRole = roles.includes(user.role.toUpperCase());
+
+    if (!isOwner && !hasRole) {
+      console.log(`checkReportOwnerOrRole: Access denied for userId=${user.id}, role=${user.role}`);
+      res.status(403).json({ message: 'Access denied: You are not the owner or authorized' });
+      return;
+    }
+
+    req.user = user;
     next();
   };
 };
@@ -484,6 +533,34 @@ const upvoteReportHandler: AsyncRequestHandler = async (req, res) => {
 };
 app.post('/api/reports/:reportId/upvote', checkUser(), upvoteReportHandler);
 
+interface AuthenticatedRequest extends Request {
+  user?: { id: string; email: string; username: string; password: string; role: string; isBanned: boolean };
+}
+
+const checkAuthenticated: express.RequestHandler = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { userEmail } = req.query.userEmail ? req.query : req.body;
+    if (!userEmail) {
+      res.status(401).json({ message: 'User email is required' });
+      return;
+    }
+    const user = await prisma.user.findUnique({ where: { email: userEmail } });
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+    req.user = user;
+    next(); // No return needed
+  } catch (error) {
+    console.error('Error in checkAuthenticated:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Downvote report endpoint
 const downvoteReportHandler: AsyncRequestHandler = async (req, res) => {
   const { reportId } = req.params;
@@ -577,7 +654,7 @@ app.post('/api/moderator-reports', checkRole(['MODERATOR']), moderatorReportsHan
 // Create incident report endpoint with image upload
 const createReportHandler: AsyncRequestHandler = async (req: Request & { file?: Express.Multer.File }, res: Response) => {
   try {
-    const { title, description, location, userId, isAnonymous } = req.body;
+    const { title, description, location, userId, isAnonymous, tags } = req.body;
 
     if (!title || !description || !location || !userId) {
       res.status(400).json({ message: 'All fields are required' });
@@ -592,6 +669,17 @@ const createReportHandler: AsyncRequestHandler = async (req: Request & { file?: 
 
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : undefined;
 
+    // Parse tags (handle both array and comma-separated string)
+    let tagsArray: string[] = [];
+    if (tags) {
+      if (Array.isArray(tags)) {
+        tagsArray = tags.map(tag => tag.trim()).filter(tag => tag);
+      } else if (typeof tags === 'string') {
+        tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+      }
+    }
+
+    // Create the incident report
     const report: IncidentReport = await prisma.incidentReport.create({
       data: {
         title,
@@ -603,7 +691,23 @@ const createReportHandler: AsyncRequestHandler = async (req: Request & { file?: 
       },
     });
 
-    res.status(201).json({ message: 'Incident report created successfully', report });
+    // Create tags and link to the report
+    if (tagsArray.length > 0) {
+      await prisma.tag.createMany({
+        data: tagsArray.map(tag => ({
+          name: tag,
+          incidentReportId: report.id,
+        })),
+      });
+    }
+
+    // Fetch the report with tags and user for the response
+    const reportWithTags = await prisma.incidentReport.findUnique({
+      where: { id: report.id },
+      include: { user: true, tags: true },
+    });
+
+    res.status(201).json({ message: 'Incident report created successfully', report: reportWithTags });
   } catch (error: any) {
     console.error('Error creating report:', error);
     res.status(500).json({ message: 'Failed to create incident report', error: error.message });
@@ -626,9 +730,9 @@ const getReportsHandler: AsyncRequestHandler = async (req, res) => {
     return;
   }
 
-  // Explicitly type the reports to include the user relation
-  const reports: (IncidentReport & { user: User })[] = await prisma.incidentReport.findMany({
-    include: { user: true },
+  // Fetch reports with user and tags
+  const reports: (IncidentReport & { user: User, tags: Tag[] })[] = await prisma.incidentReport.findMany({
+    include: { user: true, tags: true },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -648,6 +752,124 @@ const getReportsHandler: AsyncRequestHandler = async (req, res) => {
   res.json({ reports: transformedReports });
 };
 app.get('/api/reports', getReportsHandler);
+
+// Update report tags endpoint
+const updateReportTagsHandler: AsyncRequestHandler = async (req, res) => {
+  const { reportId } = req.params;
+  const { tags, userEmail } = req.body;
+
+  console.log(`updateReportTags: reportId=${reportId}, userEmail=${userEmail}`);
+
+  const report: IncidentReport | null = await prisma.incidentReport.findUnique({
+    where: { id: reportId },
+    include: { tags: true },
+  });
+  if (!report) {
+    console.log(`updateReportTags: Report not found: reportId=${reportId}`);
+    res.status(404).json({ message: 'Report not found' });
+    return;
+  }
+
+  // Parse tags (handle both array and comma-separated string)
+  let tagsArray: string[] = [];
+  if (tags) {
+    if (Array.isArray(tags)) {
+      tagsArray = tags.map(tag => tag.trim()).filter(tag => tag);
+    } else if (typeof tags === 'string') {
+      tagsArray = tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    }
+  }
+
+  try {
+    // Delete existing tags
+    await prisma.tag.deleteMany({
+      where: { incidentReportId: reportId },
+    });
+
+    // Create new tags
+    if (tagsArray.length > 0) {
+      await prisma.tag.createMany({
+        data: tagsArray.map(tag => ({
+          name: tag,
+          incidentReportId: reportId,
+        })),
+      });
+    }
+
+    // Fetch updated report with tags and user
+    const updatedReport = await prisma.incidentReport.findUnique({
+      where: { id: reportId },
+      include: { user: true, tags: true },
+    });
+
+    res.json({ message: 'Tags updated successfully', report: updatedReport });
+  } catch (error: any) {
+    console.error('Error updating tags:', error);
+    res.status(500).json({ message: 'Failed to update tags', error: error.message });
+  }
+};
+
+const searchReportsHandler: express.RequestHandler = async (
+  req: AuthenticatedRequest,
+  res: Response
+) => {
+  try {
+    const { query, userEmail } = req.query;
+    if (!userEmail) {
+      res.status(401).json({ message: 'User email is required' });
+      return;
+    }
+    if (!query || typeof query !== 'string') {
+      res.status(400).json({ message: 'Query parameter is required' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: userEmail as string } });
+    if (!user) {
+      res.status(404).json({ message: 'User not found' });
+      return;
+    }
+
+    const reports = await prisma.incidentReport.findMany({
+      where: {
+        OR: [
+          { title: { contains: (query as string).toLowerCase() } },
+          { location: { contains: (query as string).toLowerCase() } },
+          { tags: { some: { name: { contains: (query as string).toLowerCase() } } } },
+        ],
+      },
+      include: {
+        user: true,
+        tags: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formattedReports = reports.map((report) => ({
+      ...report,
+      user: {
+        ...report.user,
+        username:
+          report.isAnonymous && user.role !== 'ADMIN' && user.role !== 'MODERATOR'
+            ? 'Anonymous'
+            : report.user.username,
+      },
+    }));
+
+    res.status(200).json({ reports: formattedReports });
+  } catch (error) {
+    console.error('Error searching reports:', error);
+    res.status(500).json({ message: 'Failed to search reports' });
+  }
+};
+app.get('/api/reports/search', checkAuthenticated, searchReportsHandler);
+
+app.put('/api/reports/:reportId/tags', checkReportOwnerOrRole(['ADMIN', 'MODERATOR']), updateReportTagsHandler);
+
+app.get('/api/test', (req: Request, res: Response) => {
+  res.status(200).json({ message: 'Server is running' });
+});
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

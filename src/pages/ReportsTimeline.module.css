@@ -1,0 +1,753 @@
+.container {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  color: #333;
+}
+
+.message {
+  color: red;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.actions {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.backButton {
+  padding: 0.5rem 1rem;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.createLink {
+  padding: 0.5rem 1rem;
+  background-color: #007bff;
+  color: white;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.logoutButton {
+  padding: 0.5rem 1rem;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.noReports {
+  text-align: center;
+  color: #666;
+}
+
+.reportCard {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid #007bff;
+}
+
+.reportTitle {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.reportDescription {
+  color: #555;
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.reportMeta {
+  color: #777;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.tagsContainer {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  background-color: #28a745;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+.tagEditContainer {
+  margin-top: 0.5rem;
+}
+
+.tagInput {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  width: 200px;
+  margin-right: 0.5rem;
+}
+
+.editTagsButton,
+.saveTagsButton,
+.cancelTagsButton {
+  padding: 0.25rem 0.5rem;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.editTagsButton {
+  background-color: #17a2b8;
+}
+
+.saveTagsButton {
+  background-color: #28a745;
+}
+
+.cancelTagsButton {
+  background-color: #6c757d;
+}
+
+.imageContainer {
+  margin-top: 1rem;
+}
+
+.reportImage {
+  max-width: 200px;
+  max-height: 200px;
+  object-fit: cover;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.reportActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.voteButton {
+  background: none;
+  border: none;
+  padding: 0.25rem;
+}
+
+.voteButton:disabled {
+  cursor: not-allowed;
+}
+
+.voteCount {
+  color: #777;
+  font-size: 0.875rem;
+}
+
+.showCommentsButton,
+.hideCommentsButton {
+  padding: 0.25rem 0.5rem;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.showCommentsButton {
+  background-color: #28a745;
+}
+
+.hideCommentsButton {
+  background-color: #6c757d;
+}
+
+.deleteButton {
+  padding: 0.25rem 0.5rem;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.flagButton {
+  padding: 0.25rem 0.5rem;
+  background-color: #ff9800;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.flaggedText {
+  color: red;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.imageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.imageModalContent {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.closeModalButton {
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 2rem;
+  cursor: pointer;
+}
+
+.modalImage {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.message {
+  color: red;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.backButton,
+.createLink,
+.logoutButton {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.backButton {
+  background-color: #6c757d;
+  color: white;
+}
+
+.createLink {
+  background-color: #007bff;
+  color: white;
+  text-align: center;
+}
+
+.logoutButton {
+  background-color: #dc3545;
+  color: white;
+}
+
+.noReports {
+  text-align: center;
+  font-size: 18px;
+  color: #666;
+}
+
+.reportCard {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.reportTitle {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.reportDescription {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.reportMeta {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.tag {
+  background: #007bff;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.tagEditContainer {
+  margin: 10px 0;
+}
+
+.tagInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.tagError {
+  color: red;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.saveTagsButton,
+.cancelTagsButton,
+.editTagsButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.editTagsButton {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.saveTagsButton {
+  background-color: #28a745;
+  color: white;
+}
+
+.cancelTagsButton {
+  background-color: #dc3545;
+  color: white;
+}
+
+.imageContainer {
+  margin: 10px 0;
+}
+
+.reportImage {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.reportActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.voteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+}
+
+.voteCount {
+  font-size: 16px;
+  color: #333;
+}
+
+.showCommentsButton,
+.hideCommentsButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #6c757d;
+  color: white;
+}
+
+.deleteButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #dc3545;
+  color: white;
+}
+
+.flagButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #ff9800;
+  color: white;
+}
+
+.flaggedText {
+  color: red;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.imageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.imageModalContent {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.modalImage {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.closeModalButton {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.message {
+  color: red;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.searchContainer {
+  margin-bottom: 20px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.backButton,
+.createLink,
+.logoutButton {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.backButton {
+  background-color: #6c757d;
+  color: white;
+}
+
+.createLink {
+  background-color: #007bff;
+  color: white;
+  text-align: center;
+}
+
+.logoutButton {
+  background-color: #dc3545;
+  color: white;
+}
+
+.noReports {
+  text-align: center;
+  font-size: 18px;
+  color: #666;
+}
+
+.reportCard {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.reportTitle {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.reportDescription {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.reportMeta {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.tag {
+  background: #007bff;
+  color: white;
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+
+.tagEditContainer {
+  margin: 10px 0;
+}
+
+.tagInput {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.tagError {
+  color: red;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.saveTagsButton,
+.cancelTagsButton,
+.editTagsButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.editTagsButton {
+  background-color: #ffc107;
+  color: #333;
+}
+
+.saveTagsButton {
+  background-color: #28a745;
+  color: white;
+}
+
+.cancelTagsButton {
+  background-color: #dc3545;
+  color: white;
+}
+
+.imageContainer {
+  margin: 10px 0;
+}
+
+.reportImage {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.reportActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.voteButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+}
+
+.voteCount {
+  font-size: 16px;
+  color: #333;
+}
+
+.showCommentsButton,
+.hideCommentsButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #6c757d;
+  color: white;
+}
+
+.deleteButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #dc3545;
+  color: white;
+}
+
+.flagButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: #ff9800;
+  color: white;
+}
+
+.flaggedText {
+  color: red;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.imageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.imageModalContent {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.modalImage {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.closeModalButton {
+  position: absolute;
+  top: -15px;
+  right: -15px;
+  background: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  font-size: 20px;
+  cursor: pointer;
+}

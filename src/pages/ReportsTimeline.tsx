@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   getIncidentReports,
+  searchIncidentReports,
   IncidentReport,
   upvoteReport,
   downvoteReport,
   deleteReport,
   flagReport,
+  updateReportTags,
   VoteResponse,
 } from "../services/api";
 import { AxiosResponse } from "axios";
@@ -29,6 +31,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
   const navigate = useNavigate();
   const [reports, setReports] = useState<IncidentReport[]>([]);
   const [message, setMessage] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [votedReports, setVotedReports] = useState<{
     [key: string]: "upvote" | "downvote" | null;
@@ -36,6 +39,11 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
   const [openCommentsReportId, setOpenCommentsReportId] = useState<
     string | null
   >(null);
+  const [editingTagsReportId, setEditingTagsReportId] = useState<string | null>(
+    null
+  );
+  const [newTags, setNewTags] = useState<string>("");
+  const [tagError, setTagError] = useState<string>("");
 
   const BASE_URL = "http://localhost:5000";
 
@@ -47,20 +55,27 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
 
     const fetchReports = async () => {
       try {
-        const response: AxiosResponse<{ reports: IncidentReport[] }> =
-          await getIncidentReports(user.email);
+        let response: AxiosResponse<{ reports: IncidentReport[] }>;
+        if (searchQuery.trim()) {
+          response = await searchIncidentReports(user.email, searchQuery);
+        } else {
+          response = await getIncidentReports(user.email);
+        }
         setReports(response.data.reports || []);
+        setMessage(
+          response.data.reports.length === 0 ? "No reports found." : ""
+        );
       } catch (error: any) {
         console.error(
           "Fetch reports error:",
           error.response?.data || error.message
         );
-        setMessage("Failed to fetch reports");
+        setMessage(error.response?.data?.message || "Failed to fetch reports");
       }
     };
 
     fetchReports();
-  }, [user, navigate]);
+  }, [user, navigate, searchQuery]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,6 +101,10 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
 
   const handleBack = () => {
     navigate("/options");
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
   };
 
   const handleUpvote = async (reportId: string) => {
@@ -182,6 +201,9 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
       if (openCommentsReportId === reportId) {
         setOpenCommentsReportId(null);
       }
+      if (editingTagsReportId === reportId) {
+        setEditingTagsReportId(null);
+      }
     } catch (error: any) {
       console.error(
         "Delete report error:",
@@ -234,147 +256,164 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
     );
   };
 
+  const handleEditTags = (reportId: string, currentTags: string[]) => {
+    setEditingTagsReportId(reportId);
+    setNewTags(currentTags.join(", "));
+    setTagError("");
+  };
+
+  const handleSaveTags = async (reportId: string) => {
+    if (!user) {
+      setMessage("User not authenticated");
+      return;
+    }
+
+    // Validate tags
+    const tagsArray = newTags
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter((tag) => tag);
+    if (newTags.trim() && tagsArray.length === 0) {
+      setTagError("Tags cannot be empty or only commas");
+      return;
+    }
+
+    try {
+      const tagsString = newTags.trim(); // Send as is, empty string clears tags
+      const response = await updateReportTags(user.email, reportId, tagsString);
+      setReports(
+        reports.map((report) =>
+          report.id === reportId ? response.data.report : report
+        )
+      );
+      setEditingTagsReportId(null);
+      setNewTags("");
+      setTagError("");
+      setMessage("Tags updated successfully");
+    } catch (error: any) {
+      console.error(
+        "Update tags error:",
+        error.response?.data || error.message
+      );
+      setTagError(error.response?.data?.message || "Failed to update tags");
+    }
+  };
+
+  const handleCancelTags = () => {
+    setEditingTagsReportId(null);
+    setNewTags("");
+    setTagError("");
+  };
+
   return (
-    <div style={{ padding: "2rem", maxWidth: "800px", margin: "0 auto" }}>
-      <h2
-        style={{
-          fontSize: "2rem",
-          fontWeight: "bold",
-          marginBottom: "1.5rem",
-          textAlign: "center",
-          color: "#333",
-        }}
-      >
-        Reports Timeline
-      </h2>
-      {message && (
-        <p style={{ color: "red", marginBottom: "1rem", textAlign: "center" }}>
-          {message}
-        </p>
-      )}
-      <div
-        style={{
-          marginBottom: "1.5rem",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "1rem",
-        }}
-      >
-        <button
-          onClick={handleBack}
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "#6c757d",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "1rem",
-          }}
-        >
+    <div className={styles.container}>
+      <h2 className={styles.title}>Reports Timeline</h2>
+      {message && <p className={styles.message}>{message}</p>}
+      <div className={styles.actions}>
+        <button onClick={handleBack} className={styles.backButton}>
           Back
         </button>
-        <Link
-          to="/reports-timeline/create"
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "#007bff",
-            color: "white",
-            borderRadius: "4px",
-            textDecoration: "none",
-            fontSize: "1rem",
-            textAlign: "center",
-            display: "inline-block",
-          }}
-        >
+        <Link to="/reports-timeline/create" className={styles.createLink}>
           Create Incident Report
         </Link>
-        <button
-          onClick={handleLogout}
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "#dc3545",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "1rem",
-          }}
-        >
+        <button onClick={handleLogout} className={styles.logoutButton}>
           Logout
         </button>
       </div>
+      <div className={styles.searchContainer}>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          placeholder="Search by title, tags, or location..."
+          className={styles.searchInput}
+        />
+      </div>
       <div>
         {reports.length === 0 ? (
-          <p style={{ textAlign: "center", color: "#666" }}>
-            No reports available.
+          <p className={styles.noReports}>
+            {searchQuery
+              ? "No reports match your search."
+              : "No reports available."}
           </p>
         ) : (
           reports.map((report) => (
-            <div
-              key={report.id}
-              style={{
-                backgroundColor: "white",
-                borderRadius: "8px",
-                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                padding: "1.5rem",
-                marginBottom: "1.5rem",
-                borderLeft: "4px solid #007bff",
-              }}
-            >
-              <h3
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "bold",
-                  color: "#333",
-                  marginBottom: "0.5rem",
-                }}
-              >
-                {report.title}
-              </h3>
-              <p
-                style={{
-                  color: "#555",
-                  marginBottom: "0.5rem",
-                  lineHeight: "1.5",
-                }}
-              >
-                {report.description}
-              </p>
-              <p
-                style={{
-                  color: "#777",
-                  fontSize: "0.875rem",
-                  marginBottom: "0.25rem",
-                }}
-              >
+            <div key={report.id} className={styles.reportCard}>
+              <h3 className={styles.reportTitle}>{report.title}</h3>
+              <p className={styles.reportDescription}>{report.description}</p>
+              <p className={styles.reportMeta}>
                 <em>Location: {report.location || "Not specified"}</em>
               </p>
-              <p
-                style={{
-                  color: "#777",
-                  fontSize: "0.875rem",
-                  marginBottom: "0.25rem",
-                }}
-              >
+              <p className={styles.reportMeta}>
                 <em>
                   Created on: {new Date(report.createdAt).toLocaleString()}
                 </em>
               </p>
-              <p
-                style={{
-                  color: "#777",
-                  fontSize: "0.875rem",
-                  marginBottom: "0.25rem",
-                }}
-              >
+              <p className={styles.reportMeta}>
                 <em>
                   Created by:{" "}
                   {report.isAnonymous ? "Anonymous" : report.user.username}
                 </em>
               </p>
+              {report.tags.length > 0 && (
+                <div className={styles.tagsContainer}>
+                  {report.tags.map((tag) => (
+                    <span key={tag.id} className={styles.tag}>
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {user &&
+                (report.user.id === user.id ||
+                  user.role === "ADMIN" ||
+                  user.role === "MODERATOR") && (
+                  <div className={styles.tagEditContainer}>
+                    {editingTagsReportId === report.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={newTags}
+                          onChange={(e) => {
+                            setNewTags(e.target.value);
+                            setTagError("");
+                          }}
+                          placeholder="Enter tags (comma-separated)"
+                          className={styles.tagInput}
+                        />
+                        {tagError && (
+                          <p className={styles.tagError}>{tagError}</p>
+                        )}
+                        <button
+                          onClick={() => handleSaveTags(report.id)}
+                          className={styles.saveTagsButton}
+                        >
+                          Save Tags
+                        </button>
+                        <button
+                          onClick={handleCancelTags}
+                          className={styles.cancelTagsButton}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          handleEditTags(
+                            report.id,
+                            report.tags.map((tag) => tag.name)
+                          )
+                        }
+                        className={styles.editTagsButton}
+                      >
+                        Edit Tags
+                      </button>
+                    )}
+                  </div>
+                )}
               {report.imageUrl && (
-                <div style={{ marginTop: "1rem" }}>
+                <div className={styles.imageContainer}>
                   <img
                     src={
                       report.imageUrl.startsWith("http")
@@ -382,38 +421,16 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                         : `${BASE_URL}${report.imageUrl}`
                     }
                     alt="Incident"
-                    style={{
-                      maxWidth: "200px",
-                      maxHeight: "200px",
-                      objectFit: "cover",
-                      borderRadius: "4px",
-                      cursor: "pointer",
-                    }}
+                    className={styles.reportImage}
                     onClick={() => openImageModal(report.imageUrl!)}
                   />
                 </div>
               )}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  marginTop: "0.5rem",
-                  flexWrap: "wrap",
-                }}
-              >
+              <div className={styles.reportActions}>
                 <button
                   onClick={() => handleUpvote(report.id)}
                   disabled={votedReports[report.id] === "downvote"}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor:
-                      votedReports[report.id] === "downvote"
-                        ? "not-allowed"
-                        : "pointer",
-                    padding: "0.25rem",
-                  }}
+                  className={styles.voteButton}
                   title="Upvote"
                 >
                   <svg
@@ -431,21 +448,13 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                     <path d="M12 5l-7 7h5v7h4v-7h5l-7-7z" />
                   </svg>
                 </button>
-                <span style={{ color: "#777", fontSize: "0.875rem" }}>
+                <span className={styles.voteCount}>
                   {report.upvotes - report.downvotes}
                 </span>
                 <button
                   onClick={() => handleDownvote(report.id)}
                   disabled={votedReports[report.id] === "upvote"}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor:
-                      votedReports[report.id] === "upvote"
-                        ? "not-allowed"
-                        : "pointer",
-                    padding: "0.25rem",
-                  }}
+                  className={styles.voteButton}
                   title="Downvote"
                 >
                   <svg
@@ -467,18 +476,11 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                 </button>
                 <button
                   onClick={() => toggleComments(report.id)}
-                  style={{
-                    padding: "0.25rem 0.5rem",
-                    backgroundColor:
-                      openCommentsReportId === report.id
-                        ? "#6c757d"
-                        : "#28a745",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                    fontSize: "0.875rem",
-                  }}
+                  className={
+                    openCommentsReportId === report.id
+                      ? styles.hideCommentsButton
+                      : styles.showCommentsButton
+                  }
                 >
                   {openCommentsReportId === report.id
                     ? "Hide Comments"
@@ -489,30 +491,14 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                     <>
                       <button
                         onClick={() => handleDeleteReport(report.id)}
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: "#dc3545",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                          fontSize: "0.875rem",
-                        }}
+                        className={styles.deleteButton}
                       >
                         Delete
                       </button>
                       {!report.isFlagged && (
                         <button
                           onClick={() => handleFlagReport(report.id)}
-                          style={{
-                            padding: "0.25rem 0.5rem",
-                            backgroundColor: "#ff9800",
-                            color: "white",
-                            border: "none",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            fontSize: "0.875rem",
-                          }}
+                          className={styles.flagButton}
                         >
                           Flag
                         </button>
@@ -521,13 +507,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
                   )}
               </div>
               {report.isFlagged && (
-                <p
-                  style={{
-                    color: "red",
-                    fontSize: "0.875rem",
-                    marginTop: "0.25rem",
-                  }}
-                >
+                <p className={styles.flaggedText}>
                   <em>Flagged as False</em>
                 </p>
               )}
@@ -540,40 +520,13 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
       </div>
 
       {selectedImage && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.8)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-          onClick={closeImageModal}
-        >
+        <div className={styles.imageModal} onClick={closeImageModal}>
           <div
-            style={{
-              position: "relative",
-              maxWidth: "90%",
-              maxHeight: "90%",
-            }}
+            className={styles.imageModalContent}
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              style={{
-                position: "absolute",
-                top: "-30px",
-                right: "-30px",
-                background: "none",
-                border: "none",
-                color: "white",
-                fontSize: "2rem",
-                cursor: "pointer",
-              }}
+              className={styles.closeModalButton}
               onClick={closeImageModal}
             >
               ×
@@ -581,11 +534,7 @@ const ReportsTimeline: React.FC<ReportsTimelineProps> = ({ user, setUser }) => {
             <img
               src={selectedImage}
               alt="Enlarged incident report"
-              style={{
-                maxWidth: "100%",
-                maxHeight: "80vh",
-                borderRadius: "8px",
-              }}
+              className={styles.modalImage}
             />
           </div>
         </div>
